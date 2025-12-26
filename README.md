@@ -1,1 +1,1 @@
-# ml-polio-afp-outbreak-detection
+# ML-polio-AFP-outbreak-detection
