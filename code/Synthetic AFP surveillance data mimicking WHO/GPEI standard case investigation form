@@ -1,0 +1,70 @@
+import pandas as pd
+import numpy as np
+
+np.random.seed(42)
+n_samples = 11000  # Approx cleaned rows in paper
+
+provinces = ['Oromia', 'Amhara', 'SNNP', 'Tigray', 'Somali', 'Afar', 'Sidama', 'Addis Ababa', 'Harari', 'Dire Dawa', 'Gambela']
+districts = [f'District_{i}' for i in range(1, 150)]
+
+data = {
+    # Demographics
+    'Patient_Name': [f'Patient_{i}' for i in range(n_samples)],  # Fake
+    'Age_Months': np.random.randint(6, 180, n_samples),  # Mostly <15 years
+    'Sex': np.random.choice(['Male', 'Female'], n_samples),
+    'Province': np.random.choice(provinces, n_samples),
+    'District': np.random.choice(districts, n_samples),
+    
+    # Dates (simplified)
+    'Date_Onset': pd.date_range('2017-01-01', periods=n_samples, freq='3D'),
+    'Date_Notification': pd.date_range('2017-01-03', periods=n_samples, freq='3D'),
+    'Date_Investigation': pd.date_range('2017-01-05', periods=n_samples, freq='3D'),
+    
+    # Clinical
+    'Fever_At_Onset': np.random.choice([0, 1], n_samples, p=[0.4, 0.6]),
+    'Body_Temperature': np.random.normal(37.8, 1.0, n_samples).clip(36, 40.5),
+    'Fatigue': np.random.choice([0, 1], n_samples, p=[0.6, 0.4]),
+    'Sore_Throat': np.random.choice([0, 1], n_samples, p=[0.7, 0.3]),
+    'Limb_Discomfort': np.random.choice([0, 1], n_samples, p=[0.5, 0.5]),
+    'Asymmetric_Paralysis': np.random.choice([0, 1], n_samples, p=[0.3, 0.7]),
+    'Site_Paralysis': np.random.choice(['Right Leg', 'Left Leg', 'Right Arm', 'Left Arm', 'Both Legs'], n_samples),
+    
+    # Vaccination
+    'OPV_Doses_Routine': np.random.randint(0, 4, n_samples),
+    'OPV_Doses_SIA': np.random.randint(0, 5, n_samples),
+    
+    # Lab
+    'Specimen_1_Date': pd.date_range('2017-01-07', periods=n_samples, freq='3D'),
+    'Specimen_2_Date': pd.date_range('2017-01-09', periods=n_samples, freq='3D'),
+    'Specimen_Condition': np.random.choice(['Good', 'Poor'], n_samples, p=[0.85, 0.15]),
+    'Specimen_Number': np.random.choice([1, 2], n_samples, p=[0.1, 0.9]),  # Adequacy proxy
+    
+    # Follow-up
+    'Residual_Paralysis_60d': np.random.choice([0, 1], n_samples, p=[0.9, 0.1]),
+}
+
+df = pd.DataFrame(data)
+df['OPV_Total_Doses'] = df['OPV_Doses_Routine'] + df['OPV_Doses_SIA']
+
+# Realistic target with correlations
+risk_score = (
+    (df['Fever_At_Onset'] * 0.3) +
+    ((df['Body_Temperature'] > 38.5) * 0.3) +
+    (df['Fatigue'] * 0.2) +
+    (df['Sore_Throat'] * 0.1) +
+    ((df['OPV_Total_Doses'] < 3) * 0.2)
+)
+df['Target'] = np.where(risk_score > 1.0, 'Positive',
+                 np.where(np.random.rand(n_samples) < 0.05, 'NPENT', 'Negative'))
+
+# Add duplicates to mimic raw data
+df_raw = pd.concat([df, df.sample(7500, replace=True, random_state=42)])
+df_raw.to_csv('afp_surveillance_raw_synthetic.csv', index=False)
+
+# Clean
+df_clean = df_raw.drop_duplicates().reset_index(drop=True)
+df_clean.to_csv('afp_surveillance_clean_synthetic.csv', index=False)
+
+print("Generated! Clean rows:", len(df_clean))
+print(df_clean['Target'].value_counts())
+print("Columns:", df_clean.columns.tolist())
